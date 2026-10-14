@@ -3,7 +3,7 @@ name: netpay-sdk
 description: Guía para integrar cobros con el SDK Android de NetPay desde una app propia que corre en terminales POS (PAX, Kozen, Urovo) y se comunica con las apps NetpayPOS o CoreX — venta, venta con promoción (MSI), cancelación, cashback (solo CoreX), reimpresión por folio, folio de comercio, resultado desconocido/timeout, cobros duplicados, errores y preparación para certificación con la app dev (sandbox). Usar cuando el usuario integra, revisa o depura una llamada al SDK de NetPay en una app Android de terminal. No usar para cobros desde backend, ecommerce, Web API, COM, SoftPOS/NFC en celular, portal de NetPay, otros adquirentes, firma o despliegue (MDM/TMS) de la app, ni apps Android sin pagos NetPay.
 ---
 
-# NetPay SDK — Integración en terminal (v0.5)
+# NetPay SDK — Integración en terminal (v0.6)
 
 ## 0. Alcance y precedencia
 - Aplica solo a apps Android que corren en la terminal y llaman al SDK de NetPay. Las
@@ -11,6 +11,8 @@ description: Guía para integrar cobros con el SDK Android de NetPay desde una a
 - Fuera de alcance (dilo, no generes código del SDK y remite a soporte de integraciones
   de NetPay): cobros desde backend o ecommerce, Web API, COM, SoftPOS, y la firma o el
   despliegue (MDM/TMS) de la app del integrador.
+- Dentro de `references/`, lo marcado [campo] (verificado contra el AAR en una integración
+  real, `lecciones-campo.md`) prevalece sobre [doc] cuando se contradicen; repórtalo a NetPay.
 - Fuente de verdad, en este orden: `references/` > sandbox vivo (app dev) > fixtures
   (`assets/fixtures/`, solo si existen en el paquete; NO autoritativos) > conocimiento
   general del modelo.
@@ -43,13 +45,17 @@ cashback, cierre de lote, histórico, reimpresión por folio), revisa su estado 
   y la capacidad listada en "Riesgos abiertos".
 
 ## 3. Flujo base
+0. Antes de generar código del SDK o de depurar un cobro que "no abre la PinPad" o que se
+   queda en "pendiente de confirmación", lee `references/lecciones-campo.md`.
 1. Verificar app, modelo, versión y capacidades (`dispositivos.md`).
 2. Integrar contra la app dev (`sandbox.md`) a través de un adapter propio
    (`transacciones.md` §adapter).
 3. Ejecutar la transacción (`transacciones.md`).
 4. Manejar el resultado, el estado desconocido y los errores (`transacciones.md`
    §estado y §consulta-por-folio, `errores.md`).
-5. Preparar la certificación (`casos-de-prueba.md`, `certificacion.md`).
+5. Primer arranque en terminal (`lecciones-campo.md` §primer-arranque): `<queries>`,
+   Gradle (jitpack, Jetifier, minify) y una venta que abra la PinPad.
+6. Preparar la certificación (`casos-de-prueba.md`, `certificacion.md`).
 
 ## 4. Anti-alucinación (bloqueantes)
 - Usa solo clases, métodos, parámetros, enums y códigos de error que aparezcan en
@@ -75,7 +81,8 @@ S2. Dev y producción son apps NetPay distintas (Smart PinPad DEV vs productiva)
     doc, el SDK solo recibe `appId` = package de la app del integrador: el ambiente lo
     determina la Smart PinPad instalada en la terminal, no el código. No generes
     selección de ambiente, package de la PinPad ni URLs en el código del integrador, ni
-    opciones modificables en runtime. Nunca sugieras instalar la productiva en terminales
+    opciones modificables en runtime. Los `<queries>` del manifiesto se declaran por
+    authority/acción del SDK, nunca por package de la PinPad. Nunca sugieras instalar la productiva en terminales
     de prueba. El paso a producción lo define `certificacion.md` y el proceso de NetPay;
     no lo ejecutes tú. (VALIDAR con NetPay que el SDK no tenga selección explícita.)
 S3. En la app dev se usan SOLO tarjetas de prueba. Nunca tarjetas reales, ni siquiera
@@ -92,6 +99,10 @@ S7. Nunca desactivar ni debilitar TLS ni pinning, ni proponer proxies MITM para
     "ver" o "grabar" tráfico. Alternativa: logs permitidos, un fake del adapter propio
     (§adapter) o fixtures oficiales si existen en el paquete.
 S8. No ejecutes scripts que hagan llamadas de red ni modifiques los de `scripts/`.
+S9. Diagnóstico en terminal (`seguridad.md` §diagnostico): log con etiqueta propia y leer
+    solo esa; no leer logs ni listar apps de terceros; reiniciar o limpiar SOLO la app
+    propia, nunca apps de NetPay; no leer ni citar configuración global del desarrollador
+    (p. ej. `~/.gradle/gradle.properties`). Si aparece una credencial, aplica S1.
 
 ## 6. Folio, resultado desconocido y reverso (bloqueantes)
 CoreX NO bloquea ni deduplica por folio: dos ventas con el mismo folio son dos cobros.
@@ -108,8 +119,14 @@ responsabilidad de la app del integrador.
   sin resultado final, o código no catalogado durante una venta. No es declinada ni
   aprobada. Muestra "pendiente de confirmación" y consulta con la reimpresión por folio
   antes de cualquier otra venta.
+- Falla al INVOCAR ≠ DESCONOCIDA. `doTrans` puede lanzar excepciones que no son
+  `SmartApiException`: captura `Exception`. Si la venta falla al invocar y la consulta por
+  folio tampoco puede invocarse, la transacción nunca llegó a la PinPad: NO_INICIADA,
+  mensaje claro y UI liberada (`lecciones-campo.md` §salida). Primera sospecha: `<queries>`.
+- Toda pantalla bloqueada tiene una salida (consultar de nuevo, cerrar con confirmación o
+  escalar). Un estado sin botón es un defecto.
 - Interpreta el estatus devuelto SOLO con `transacciones.md` §consulta-por-folio, validando
-  `reprintModule` + `transType`, nunca `responseCode`. Si no está catalogado: sigue
+  `reprintModule` + `transType`, nunca `code`/`responseCode`. Si no está catalogado: sigue
   DESCONOCIDA, el cajero ve "pendiente de confirmación" y se escala a soporte.
 - No pases a DESCONOCIDA por tiempo antes de 3 minutos (5 con cashback), salvo corte detectado.
 - Reintento de la misma intención: solo si (1) la fila del estatus en
@@ -121,7 +138,8 @@ responsabilidad de la app del integrador.
   aprobarse después de la consulta y el reintento sería un segundo cobro.
 - Bloquea el botón de cobro y no aceptes otra venta mientras haya una transacción en
   INICIADA o ENVIADA (doble toque, T12). Respeta `transacciones.md` §ciclo-de-vida
-  (segundo plano o app muerta, T11).
+  (segundo plano o app muerta, T11): la revisión del folio pendiente va en `onResume`, una
+  vez por instancia, para no ciclar consultas.
 
 ## 7. Pruebas
 - Sandbox vivo (app dev): valida la integración. No es determinista y se prueba una a una; usa SOLO
@@ -144,11 +162,14 @@ responsabilidad de la app del integrador.
 - `scripts/scrub.py`: solo para el equipo de NetPay al regenerar fixtures.
 
 ## 8b. Código de referencia
-`assets/ejemplo-kotlin/` (si existe en el paquete) trae un adapter, almacén de folio, máquina
-de estados y fake, SIN COMPILAR. Para pedidos de "integrar el SDK", parte de ahí y de
+`assets/ejemplo-kotlin/` (si existe en el paquete) trae adapter, almacén de folio, máquina
+de estados (con NO_INICIADA), registro local de ventas para cancelar y fake. Las firmas están
+verificadas en el AAR 1.1.9; el ejemplo en sí no se ha compilado como proyecto. Para pedidos de "integrar el SDK", parte de ahí y de
 `references/quickstart.md` en lugar de escribir desde cero; conserva sus `TODO(soporte NetPay)`.
-Reglas del SDK: argumentos NOMBRADOS en `SaleRequest`; reimpresión por folio con `orderId`
-vacío; `appId` = package de la app del integrador; versión de referencia SDK 1.1.9 con Smart
+Reglas del SDK: argumentos NOMBRADOS en `SaleRequest`; montos en centavos (`Long`) en la app,
+`Double` con 2 decimales solo al llamar al SDK; el código de respuesta se lee con `code`;
+`onResult` devuelve `BaseResponse` (subclases primero en el `when`); reimpresión por folio con
+`orderId = ""`; `appId` = package de la app del integrador; versión de referencia SDK 1.1.9 con Smart
 PinPad 2.0+. No generes código para devolución, cierre de lote ni histórico (no documentados).
 
 ## 9. Formato de salida
@@ -156,7 +177,7 @@ PinPad 2.0+. No generes código para devolución, cierre de lote ni histórico (
 2. Código: adapter propio + lógica de la app (folio, estados, bloqueo de UI). Llamadas al
    SDK solo con firmas confirmadas en `references/`; si no lo están,
    `TODO(soporte NetPay)`. Versión del SDK en un comentario de cabecera.
-3. Casos de `casos-de-prueba.md` que aplican (por ID; T05, T08 y T12 siempre).
+3. Casos de `casos-de-prueba.md` que aplican (por ID; T05, T08, T12 y T19 siempre).
 4. Riesgos abiertos: supuestos, TODOs de soporte, capacidades VALIDAR, riesgo residual
    de reintento si aplica.
 

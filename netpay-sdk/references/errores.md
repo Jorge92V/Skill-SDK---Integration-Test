@@ -14,7 +14,10 @@
 | Mensaje "Cancelado por el usuario" | El usuario canceló sin insertar tarjeta | Sin cobro; libera UI |
 | Mensaje "INTENTE OTRA INTERFAZ" | Contactless Visa declinada en monto alto | Pedir otra interfaz (chip) |
 | Reimpresión: "No se encontraron datos", `success` false | Folio inexistente | Ver §consulta-por-folio (sin registro) |
-| `SmartApiException` | Falla al invocar el SDK; hay `message` en texto libre | DESCONOCIDA si ya se llamó a `doTrans`; no hay catálogo |
+| `IllegalArgumentException: Unknown URL content://...` al llamar `doTrans` [campo] | La app no ve el provider/intent de la Smart PinPad (Android 11+) | Declarar `<queries>` (lecciones-campo.md §visibilidad). La venta NO llegó a la PinPad; si la consulta por folio tampoco se invoca: NO_INICIADA |
+| `SmartApiException` "Monto inválido" [campo] | Monto fuera de 0.01–999,999.99 (validación local) | Validar antes; no llegó a la PinPad |
+| `SmartApiException` "OrderId inválido Reprint Request" [campo] | Reimpresión sin `orderId` ni `folioId` | Enviar `folioId` y `orderId = ""` |
+| Otra `SmartApiException` o excepción al invocar | Falla al invocar el SDK; hay `message` en texto libre | Falla de invocación (lecciones-campo.md §salida): consultar por folio; si tampoco se invoca, NO_INICIADA. Sin catálogo |
 | `RESULT_CANCELED` | El usuario se retiró o falló | DESCONOCIDA: consultar por folio |
 | Error 13 al instalar la Smart PinPad DEV | Está instalada la "App de Pagos" | Pedir a NetPay que la desinstale |
 

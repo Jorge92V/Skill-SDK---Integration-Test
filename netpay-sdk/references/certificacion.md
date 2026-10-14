@@ -16,9 +16,12 @@
    en la doc de NetPay; firma y despliegue quedan fuera del alcance de este skill).
 
 ## Checklist técnico (también es el chequeo manual si no hay script)
-- [ ] Casos T05, T08 y T12 ejecutados y los que apliquen de T01–T19 — ver casos-de-prueba.md
+- [ ] Casos T05, T08 y T12 ejecutados y los que apliquen de T01–T20 — ver casos-de-prueba.md
 - [ ] Manejo de reversos implementado (obligatorio antes de certificar [doc]): estatus `RV` y `PRV` por consulta
 - [ ] Folio único por intención, viaja en la venta, persistido antes de llamar al SDK, nunca reutilizado
+- [ ] `<queries>` declarado; una venta de prueba abre la PinPad (T19)
+- [ ] Toda pantalla bloqueada tiene salida; falla de invocación libera la UI (NO_INICIADA)
+- [ ] Revisión de folio pendiente en `onResume`, una vez por instancia (sin bucle de consultas)
 - [ ] Sin reverso propio en la app
 - [ ] Consulta por folio ante estado desconocido y al reabrir con folio pendiente
 - [ ] Espera mínima de 3 minutos (5 con cashback) antes de dar por perdida una respuesta

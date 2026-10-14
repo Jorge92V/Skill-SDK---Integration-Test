@@ -27,6 +27,8 @@
 ## Marcas y modelos
 Marcas: PAX, Kozen, Urovo. Cámara: solo PAX A910S e IM30 [doc]. Comportamiento específico de Kozen y
 Urovo: la doc solo indica que "puede variar" (VALIDAR). Matriz modelo × versión: VALIDAR.
+[campo] Integración real funcionando: CoreX + SDK 1.1.9 en terminal Kozen con Android 15. El nombre de modelo
+que reporta el sistema puede no coincidir con el comercial: registrar ambos y confirmar con NetPay.
 
 ## Versiones [doc]
 | Pieza | Dato |

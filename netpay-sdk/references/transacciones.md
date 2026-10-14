@@ -4,21 +4,25 @@
 > folio SDK, Manejo de reversos SDK, Certificación), consultada el 2026-10-13. Cada dato lleva
 > su origen: **[doc]** = documentado por NetPay, **[skill]** = política de este skill (no de
 > NetPay), **VALIDAR** = no confirmado. NetPay debe validar todo lo marcado [skill] y VALIDAR.
+> **[campo]** = verificado en una integración real contra el AAR 1.1.9 (references/lecciones-campo.md); ante
+> contradicción con [doc], prevalece lo observado en el AAR y se reporta a NetPay.
 > Versión del SDK de referencia: 1.1.9 con Smart PinPad 2.0 o superior [doc]. La doc de NetPay
 > tiene inconsistencias entre secciones (ver README, "Defectos de la documentación fuente").
 
 ## §operaciones
 Todas se envían con `smartApi.doTrans(request)` [doc]. Los parámetros llevan `appId` = package
-name de LA APP DEL INTEGRADOR [doc].
+name de LA APP DEL INTEGRADOR [doc]. Requisito con `targetSdk >= 30`: `<queries>` en el manifiesto
+(lecciones-campo.md §visibilidad) [campo]. `doTrans` puede lanzar excepciones distintas de
+`SmartApiException`: capturar `Exception` [campo].
 
 | Operación | Request [doc] | Notas [doc] |
 |---|---|---|
-| Venta | `SaleRequest(appId, amount: Double, msi: Int?, tip: Double?, folio: String)` | Usar argumentos NOMBRADOS: el orden posicional difiere entre los ejemplos Kotlin y Java de NetPay. `amount` máx. 2 decimales. |
+| Venta | `SaleRequest(appId, amount: Double, tip: Double?, msi: Int?, waiter, settlementId, settlementDate, table, folio, ...)` [campo: orden real del AAR] | Usar argumentos NOMBRADOS: el orden difiere de los ejemplos de la doc. `amount` 0.01–999,999.99, 2 decimales; fuera de rango el SDK lanza `SmartApiException` "Monto inválido" [campo]. En la app, montos en centavos (`Long`). |
 | Venta con promoción | `SaleRequest` con `msi` | No hay request aparte. `msi` ∈ {3, 6, 9, 12, 18}. 18 no aplica a Amex (matriz de certificación). |
 | Propina | `SaleRequest` con `tip` | Máx. 25% (límite actual); debe activarse en el menú oculto de la Smart PinPad. |
-| Cancelación | `CancelRequest(appId, orderId)` | Solo mismo día, antes de las 20:00 hora de Ciudad de México, por el monto total. |
-| Reimpresión por orderId | `ReprintRequest(appId, orderId)` | |
-| Reimpresión por folio | `ReprintRequest(appId, orderId, folioId = folio)` | Con `orderId` VACÍO. Si se envían ambos, gana `orderId` y la recuperación por folio no se completa. `folioId` máx. 250 caracteres. |
+| Cancelación | `CancelRequest(appId, orderId, storeId)` [campo] (valor de `storeId`: VALIDAR) | Solo mismo día, antes de las 20:00 hora de Ciudad de México, por el monto total. |
+| Reimpresión por orderId | `ReprintRequest(appId, orderId, storeId, folioId)` [campo] | |
+| Reimpresión por folio | `ReprintRequest(appId = appId, orderId = "", storeId = ..., folioId = folio)` | Con `orderId = ""` explícito; sin `orderId` ni `folioId` el SDK lanza "OrderId inválido Reprint Request" [campo]. Si se envían ambos, gana `orderId` y la recuperación por folio no se completa. `folioId` máx. 250 caracteres. |
 | Ticket personalizado | `PrintRequest(appId, page)` | Requiere SDK 1.1.9 y Smart PinPad 2.0+; se certifica ANTES que el resto. |
 | Lectura banda magnética | `ReadRequest(appId)` | Solo tarjetas NO financieras. |
 | Devolución, cierre de lote, histórico, cashback | — | NO documentados en el SDK 1.1.9: ver dispositivos.md. |
@@ -49,11 +53,13 @@ Para respuesta y callbacks ver §respuesta.
 |---|---|---|
 | INICIADA | Folio generado y persistido | Bloquea UI de cobro |
 | ENVIADA | `doTrans` invocado | Espera respuesta; UI bloqueada |
-| APROBADA | `resultCode == RESULT_OK`, `success == true` y `responseCode == "00"` | Muestra resultado, libera UI |
-| DESCONOCIDA | Cualquier otro caso (ver abajo) | "Pendiente de confirmación"; consulta por folio; UI bloqueada |
+| APROBADA | `resultCode == RESULT_OK`, `success == true` y `code == "00"` (`responseCode` en la doc) | Muestra resultado, libera UI |
+| DESCONOCIDA | Cualquier otro caso (ver abajo) | "Pendiente de confirmación"; consulta por folio; UI bloqueada pero con salida (consultar de nuevo / escalar) |
+| NO_INICIADA [campo] | `doTrans` de la venta falló al invocar Y la consulta por folio tampoco pudo invocarse | "No se pudo comunicar con la Smart PinPad; el cobro no se inició"; libera UI |
 | RESUELTA | La consulta por folio devuelve un estatus catalogado | Actúa según §consulta-por-folio |
 
-DESCONOCIDA incluye: `RESULT_CANCELED`, `data` nulo, `SmartApiException`, ausencia de respuesta,
+Falla al INVOCAR (excepción síncrona) ≠ respuesta no concluyente [campo]: ver lecciones-campo.md §salida.
+DESCONOCIDA incluye: `RESULT_CANCELED`, `data` nulo, excepción al leer la respuesta, ausencia de respuesta,
 corte de comunicación, crash o app reabierta sin resultado final, y cualquier `responseCode` distinto
 de "00" (el catálogo de códigos NO está publicado: solo se conocen "00" y el ejemplo "05" =
 "SIN COMUNICACIÓN"; ver errores.md). La consulta por folio es barata y evita decidir sobre un código
@@ -109,10 +115,16 @@ La doc no describe qué pasa si la app del integrador pasa a segundo plano o mue
 ni si la Smart PinPad conserva el estado: VALIDAR (es un caso de la matriz: T11).
 Regla mínima [skill]: al reabrir con un folio persistido sin resultado final, pasar a DESCONOCIDA y
 consultar por folio antes de permitir otra venta.
+[campo] `onActivityResult` corre ANTES de `onResume`: esa revisión va en `onResume` (no en `onCreate`) y UNA
+vez por instancia del Activity, o un estatus no catalogado provoca un bucle de consultas. Evitar recreación
+del Activity con `launchMode="singleTask"` y `configChanges` (lecciones-campo.md §ciclo).
 Multi-instancia: la matriz de certificación exige bloquear el botón de cobro tras el primer envío, sin
 ventas duplicadas.
 
 ## §respuesta
+[campo] `onResult` devuelve `BaseResponse`; `CancelResponse` y `ReprintResponse` heredan de `SaleResponse`
+(en un `when` con `is`, subclases primero). `success` es `Boolean` no nulo; el código se lee con `code`; el folio
+con `folioNumber`. El resultado llega por `startActivityForResult` (funciona con `ComponentActivity`/Compose).
 Recepción [doc]: en `onActivityResult(requestCode, resultCode, data)`, si `data != null`, llamar
 `smartApi.onResult(requestCode, resultCode, data)` y convertir según `requestCode`:
 `Constants.SALE_REQUEST` → `SaleResponse`, `CANCEL_REQUEST` → `CancelResponse`,
@@ -128,7 +140,7 @@ terminalId, orderId, preAuth, promotion, rePrintDate, rePrintMark, reprintModule
 storeName, streetName, tableId, tipAmount, tipLessAmount, transDate, transType, transactionCertificate,
 transactionId, message, rrnNumber, sdkVersion, spanRoute, traceability, hasPin, isRePrint, success,
 isQps, preStatus.
-- `responseCode == "00"` indica transacción exitosa; cualquier otro valor se trata como problema.
+- `code == "00"` (la doc lo llama `responseCode`) indica transacción exitosa; cualquier otro valor se trata como problema.
 - Desde SDK 1.1.9, `rrnNumber` es independiente de `orderId` (en 1.1.8, `orderId` = RRN + serie).
   Si se reimprime con `orderId`, puede requerir ajuste al migrar.
 - `amount` ya no incluye propina desde 1.1.8 (la doc se contradice en este punto: VALIDAR).
@@ -136,7 +148,9 @@ isQps, preStatus.
 - Campos sensibles y permitidos para log: ver seguridad.md §logging.
 
 ## §ventanas
-- Cancelación: mismo día, antes de las 20:00 (hora de Ciudad de México), monto total [doc].
+- Cancelación: mismo día, antes de las 20:00 (hora de Ciudad de México), monto total [doc]. En la app: zona
+  `America/Mexico_City` (no la del dispositivo), registro local de ventas aprobadas porque el SDK no expone
+  histórico, sin doble cancelación; cancelación no confirmada = "sin confirmar", ni cancelada ni vigente [campo].
 - Devolución y su ventana respecto al cierre de lote: NO documentado para SDK: VALIDAR.
 - Cierre de lote automático: la doc indica corte automático cerca de las 450 transacciones (menú
   oculto de la Smart PinPad). No hay operación de cierre/histórico por SDK documentada.

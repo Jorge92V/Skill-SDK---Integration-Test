@@ -1,11 +1,13 @@
-// Ejemplo de referencia — SDK Smart 1.1.9 / Smart PinPad 2.0+ — SIN COMPILAR (ver README.md)
-// Firmas tomadas de la doc pública de NetPay. Lo no confirmado está marcado TODO(soporte NetPay).
+// Ejemplo de referencia — SDK Smart 1.1.9 / Smart PinPad 2.0+ (ver README.md)
+// Firmas: lecciones-campo.md §firmas (verificadas en el AAR 1.1.9). Lo no confirmado: TODO(soporte NetPay).
+// Requisito: <queries> en el manifiesto (lecciones-campo.md §visibilidad), si no doTrans lanza
+// IllegalArgumentException "Unknown URL content://..." antes de abrir la PinPad.
 package com.example.pagos
 
 import android.app.Activity
 import android.content.Intent
+import android.util.Log
 import mx.com.netpay.sdk.SmartApiFactory
-import mx.com.netpay.sdk.exceptions.SmartApiException
 import mx.com.netpay.sdk.models.*
 
 class NetpaySmartGateway(private val activity: Activity) : PaymentGateway {
@@ -13,32 +15,48 @@ class NetpaySmartGateway(private val activity: Activity) : PaymentGateway {
     // Kotlin. En Java: SmartApiFactory.INSTANCE.createSmartApi(activity)
     private val smartApi = SmartApiFactory.createSmartApi(activity)
 
-    // appId = package name de LA APP DEL INTEGRADOR (no el de la Smart PinPad).
+    // appId = package name de LA APP DEL INTEGRADOR (no el de la Smart PinPad; el ambiente lo marca la PinPad).
     private val appId: String = activity.packageName
 
-    override fun startSale(amount: Double, folio: String, msi: Int?, tip: Double?) {
-        // Argumentos NOMBRADOS: el orden posicional difiere entre los ejemplos Kotlin y Java de NetPay.
-        // amount: máx. 2 decimales. msi ∈ {3,6,9,12,18}. tip: máx. 25%, requiere activarse en la PinPad.
-        val request = SaleRequest(
-            appId = appId,
-            amount = amount,
-            msi = msi,
-            tip = tip,
-            folio = folio
+    // TODO(soporte NetPay): qué valor lleva storeId en Cancel/Reprint y si es opcional. NO es una credencial:
+    // nunca poner aquí Store ID/Password de login de la PinPad.
+    private val storeId: String = ""
+
+    override fun startSale(amountCents: Long, folio: String, msi: Int?, tipCents: Long?) = invoke("sale") {
+        smartApi.doTrans(
+            SaleRequest(                       // SIEMPRE argumentos nombrados: el orden real difiere de la doc
+                appId = appId,
+                amount = toAmount(amountCents),
+                tip = tipCents?.let(::toAmount), // SUPUESTO: tip va aparte de amount (confirmar con T17)
+                msi = msi,
+                folio = folio
+                // waiter, settlementId, settlementDate, table: no se usan en este ejemplo.
+                // TODO(soporte NetPay): confirmar que tienen valor por defecto en el AAR.
+            )
         )
-        // TODO(soporte NetPay): confirmar nombre del campo (folio vs folioId) y si doTrans lanza
-        // SmartApiException de forma síncrona; en ese caso el llamador pasa a DESCONOCIDA.
-        smartApi.doTrans(request)
     }
 
-    override fun startLookupByFolio(folio: String) {
-        // orderId VACÍO: si se envían ambos, gana orderId y la recuperación por folio no se completa.
-        smartApi.doTrans(ReprintRequest(appId, "", folioId = folio))
+    override fun startLookupByFolio(folio: String) = invoke("lookup") {
+        // orderId = "" explícito: si van ambos, gana orderId y la recuperación por folio no se completa.
+        smartApi.doTrans(ReprintRequest(appId = appId, orderId = "", storeId = storeId, folioId = folio))
     }
 
-    override fun startCancel(orderId: String) {
-        // Solo mismo día, antes de las 20:00 (CDMX), por el monto total.
-        smartApi.doTrans(CancelRequest(appId, orderId))
+    override fun startCancel(orderId: String) = invoke("cancel") {
+        smartApi.doTrans(CancelRequest(appId = appId, orderId = orderId, storeId = storeId))
+    }
+
+    /**
+     * Captura Exception, no solo SmartApiException: doTrans también lanza IllegalArgumentException
+     * (provider no visible). Loguea clase, mensaje y 3 frames; nunca datos de tarjeta (no hay: la PinPad no abrió).
+     */
+    private inline fun invoke(op: String, block: () -> Unit) {
+        try {
+            block()
+        } catch (e: Exception) {
+            val frames = e.stackTrace.take(3).joinToString(" | ")
+            Log.w(TAG, "invoke op=$op ${e.javaClass.simpleName}: ${e.message} @ $frames")
+            throw InvocationFailed("${e.javaClass.simpleName}: ${e.message}")
+        }
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): GatewayResult? {
@@ -47,53 +65,40 @@ class NetpaySmartGateway(private val activity: Activity) : PaymentGateway {
             requestCode != Constants.REPRINT_REQUEST
         ) return null
 
-        // RESULT_CANCELED (usuario se retiró o falló) o data nulo: NO es declinada; es DESCONOCIDA.
+        // RESULT_CANCELED (usuario se retiró o falló) o data nulo: NO es declinada; es no concluyente.
         if (resultCode != Activity.RESULT_OK || data == null) {
-            return GatewayResult.Failure("resultCode=$resultCode data=${data != null}")
+            return GatewayResult.Inconclusive("resultCode=$resultCode data=${data != null}")
         }
         return try {
-            // TODO(soporte NetPay): confirmar el tipo de retorno de onResult y el callback vigente
-            // (la doc usa onActivityResult y onActivityCallResult).
-            val raw = smartApi.onResult(requestCode, resultCode, data)
-            when (requestCode) {
-                Constants.SALE_REQUEST -> GatewayResult.Sale(toOutcome(raw as SaleResponse))
-                Constants.CANCEL_REQUEST -> GatewayResult.Cancel(toOutcome(raw as CancelResponse))
-                else -> GatewayResult.Lookup(toLookup(raw as ReprintResponse))
+            // onResult devuelve BaseResponse. CancelResponse y ReprintResponse HEREDAN de SaleResponse:
+            // las subclases van primero en el when.
+            when (val r = smartApi.onResult(requestCode, resultCode, data)) {
+                is ReprintResponse -> GatewayResult.Lookup(toLookup(r))
+                is CancelResponse -> GatewayResult.Cancel(toOutcome(r))
+                is SaleResponse -> GatewayResult.Sale(toOutcome(r))
+                else -> GatewayResult.Inconclusive("respuesta de tipo inesperado")
             }
-        } catch (e: SmartApiException) {
-            // No loguear el objeto completo. Solo el mensaje de la excepción.
-            GatewayResult.Failure("SmartApiException: ${e.message}")
-        } catch (e: ClassCastException) {
-            GatewayResult.Failure("respuesta con tipo inesperado")
+        } catch (e: Exception) {
+            GatewayResult.Inconclusive("${e.javaClass.simpleName}: ${e.message}")
         }
     }
 
-    // Se copian SOLO los campos permitidos. cardNumber, bin, arqc, aid, etc. nunca salen de aquí.
-    // TODO(soporte NetPay): confirmar los nombres de acceso (success/isSuccess, etc.) en las clases reales.
+    // Se copian SOLO campos permitidos. cardNumber, bin, arqc, aid, etc. nunca salen de aquí.
     private fun toOutcome(r: SaleResponse) = SaleOutcome(
-        success = r.success == true,
-        responseCode = r.responseCode,
+        success = r.success,          // Boolean no nulo en 1.1.9
+        code = r.code,                // la doc lo llama responseCode
         message = r.message,
         orderId = r.orderId,
         rrnNumber = r.rrnNumber,
         transType = r.transType
     )
 
-    private fun toOutcome(r: CancelResponse) = SaleOutcome(
-        success = r.success == true,
-        responseCode = r.responseCode,
-        message = r.message,
-        orderId = r.orderId,
-        rrnNumber = r.rrnNumber,
-        transType = r.transType
-    )
-
-    // La reimpresión se valida con reprintModule + transType, NUNCA con responseCode.
+    // La reimpresión se valida con reprintModule + transType, NUNCA con code/responseCode.
     private fun toLookup(r: ReprintResponse): FolioLookup {
         val module = r.reprintModule
         val type = r.transType
         val status = when {
-            r.success != true -> FolioStatus.SIN_REGISTRO // "No se encontraron datos"
+            !r.success -> FolioStatus.SIN_REGISTRO // "No se encontraron datos"
             module == "C" && type == "A" -> FolioStatus.APROBADA
             module == "C" && type == "V" -> FolioStatus.CANCELADA
             module == "D" -> FolioStatus.DECLINADA
@@ -101,6 +106,13 @@ class NetpaySmartGateway(private val activity: Activity) : PaymentGateway {
             module == "PRV" -> FolioStatus.PENDIENTE_REVERSO
             else -> FolioStatus.NO_CATALOGADO
         }
-        return FolioLookup(status, r.message)
+        return FolioLookup(status, r.orderId, r.message)
+    }
+
+    companion object {
+        const val TAG = "pagos"   // etiqueta propia: leer solo con `adb logcat -s pagos`
+
+        /** Centavos → Double con 2 decimales. El SDK valida 0.01–999,999.99 ("Monto inválido"). */
+        fun toAmount(cents: Long): Double = java.math.BigDecimal.valueOf(cents, 2).toDouble()
     }
 }

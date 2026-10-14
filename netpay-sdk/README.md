@@ -1,8 +1,9 @@
-# netpay-sdk — skill v0.5
+# netpay-sdk — skill v0.6
 
 Archivo para humanos (mantenedores). No forma parte de las instrucciones que carga Claude.
 
 ## Estado
+v0.6: incorpora `references/lecciones-campo.md` (integración real, firmas verificadas en el AAR).
 v0.5: references/ integra la doc pública de NetPay (SDK 1.1.9, Smart PinPad 2.0+) con etiquetas
 [doc] / [skill] / VALIDAR, y `assets/ejemplo-kotlin/` trae adapter + folio + estados + fake (SIN COMPILAR).
 Siguen en VALIDAR: catálogo de códigos de respuesta, cashback, devolución,
@@ -31,6 +32,12 @@ SKILL.md condiciona su uso a "si existe en el paquete"; el modelo no debe descri
 `evals/evals.json`. Solo se corren los casos `listo`. Al llenar un VALIDAR, revisar los casos `pendiente_*` relacionados y los `listo` que hoy esperan "no confirmado".
 
 ## Defectos de la documentación fuente (para el dueño de la doc de NetPay)
+- (campo) Falta documentar `<queries>`/visibilidad de paquetes para apps con `targetSdk >= 30`; sin eso `doTrans`
+  lanza `IllegalArgumentException: Unknown URL content://...`.
+- (campo) La doc nombra `responseCode`; el SDK 1.1.9 expone `code`. Firmas reales de `SaleRequest`,
+  `CancelRequest` y `ReprintRequest` (con `storeId`) no coinciden con la doc.
+- (campo) Sin catálogo de excepciones del SDK (incluye `IllegalArgumentException` por provider no resuelto).
+- (campo) Requisitos de build no documentados: Jetifier, reglas de minify, jitpack con `FAIL_ON_PROJECT_REPOS`.
 - Orden de parámetros de `SaleRequest` distinto entre ejemplos Kotlin y Java.
 - Nombre del campo de folio: `folio` / `folioId` / `folioNumber`.
 - Callback `onActivityResult` vs `onActivityCallResult`.

@@ -6,9 +6,8 @@ import java.util.UUID
 
 /**
  * Persiste el folio y el estado ANTES de llamar al SDK, para sobrevivir a un crash o cierre de la app.
- * Solo guarda folio, estado, monto, vínculo al folio anterior y timestamps. Nada de datos de tarjeta.
- *
- * Una sola transacción activa por vez (la UI se bloquea mientras haya INICIADA/ENVIADA/DESCONOCIDA).
+ * Solo guarda folio, estado, monto en centavos, vínculo al folio anterior y timestamps. Nada de tarjeta.
+ * Ojo: sobrevive también a `adb install -r` (lecciones-campo.md §terminal).
  */
 class FolioStore(context: Context) {
 
@@ -17,7 +16,8 @@ class FolioStore(context: Context) {
     data class Record(
         val folio: String,
         val state: PaymentState,
-        val amount: Double,
+        val amountCents: Long,
+        val tipCents: Long?,
         val previousFolio: String?, // vínculo en reintentos (transacciones.md §reintento)
         val sentAtMillis: Long?
     )
@@ -31,7 +31,8 @@ class FolioStore(context: Context) {
         return Record(
             folio = folio,
             state = PaymentState.valueOf(prefs.getString("state", PaymentState.INICIADA.name)!!),
-            amount = Double.fromBits(prefs.getLong("amount", 0.0.toRawBits())),
+            amountCents = prefs.getLong("amount", 0),
+            tipCents = if (prefs.contains("tip")) prefs.getLong("tip", 0) else null,
             previousFolio = prefs.getString("previous", null),
             sentAtMillis = if (prefs.contains("sentAt")) prefs.getLong("sentAt", 0) else null
         )
@@ -39,14 +40,16 @@ class FolioStore(context: Context) {
 
     /** commit() síncrono: el folio debe estar en disco antes de llamar a doTrans. */
     fun save(r: Record) {
-        prefs.edit()
+        val e = prefs.edit()
             .putString("folio", r.folio)
             .putString("state", r.state.name)
-            .putLong("amount", r.amount.toRawBits())
+            .putLong("amount", r.amountCents)
             .putString("previous", r.previousFolio)
-            .apply { if (r.sentAtMillis != null) putLong("sentAt", r.sentAtMillis) else remove("sentAt") }
-            .commit()
+        if (r.tipCents != null) e.putLong("tip", r.tipCents) else e.remove("tip")
+        if (r.sentAtMillis != null) e.putLong("sentAt", r.sentAtMillis) else e.remove("sentAt")
+        e.commit()
     }
 
-    fun clear() { prefs.edit().clear().commit() }
+    /** Solo para builds de desarrollo (BuildConfig.DEBUG): limpia un folio atascado de pruebas anteriores. */
+    fun clearForDevelopment() { prefs.edit().clear().commit() }
 }

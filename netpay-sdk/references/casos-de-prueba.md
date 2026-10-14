@@ -28,8 +28,12 @@ de API (la de SDK existe pero no está en la doc pública consultada: VALIDAR qu
 | T16 | Folio inexistente | Folio que no existe | `success == false`, "No se encontraron datos"; sin conclusión de cobro | — |
 | T17 | Propina (activada / desactivada en menú oculto) | Datos del sandbox | Monto y propina correctos; `amount` sin propina desde 1.1.8 | opcional |
 | T18 | Cashback (solo CoreX) | VALIDAR | Espera de 5 min; certificación propia | opcional |
+| T19 | La PinPad no se puede invocar (sin `<queries>` o PinPad no instalada) | Entorno: quitar `<queries>` en un build de prueba | Venta y consulta fallan al invocar: NO_INICIADA, UI liberada con mensaje claro; sin bucle en "pendiente" | — |
+| T20 | Cancelación fuera de regla o no confirmada | Venta de otro día / después de 20:00 CDMX / ya cancelada; cortar comunicación durante la cancelación | La app bloquea antes de llamar al SDK; si no se confirma: "sin confirmar", verificar terminal y escalar | opcional |
 
 Cambios de alcance (MSI, propina, cashback, devoluciones, NFC) requieren recertificar [doc].
+
+Primer arranque y diagnóstico en terminal: lecciones-campo.md §primer-arranque y §diagnostico.
 
 ## Guion de entorno (T05, T08, T10, T11)
 Pasos exactos para provocarlos en terminal real: los de T05 (temporizador) y T08 (retirar tarjeta, apagar

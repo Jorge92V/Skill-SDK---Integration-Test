@@ -20,3 +20,4 @@
 | Smart PinPad | App de NetPay en la terminal que procesa el cobro | — |
 | Smart PinPad DEV | Clon de la productiva apuntando a sandbox (leyenda "VERSIÓN DEMO") | — |
 | appId | Package name de la app del integrador | Primer parámetro de todos los requests [doc] |
+| responseCode | Código de respuesta ("00" = éxito) | En el SDK 1.1.9 la propiedad es `code` [campo] |

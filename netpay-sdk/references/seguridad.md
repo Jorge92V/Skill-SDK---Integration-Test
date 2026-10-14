@@ -26,6 +26,12 @@ con transacciones de prueba.
 La opción "Enviar Logs" de la Smart PinPad (menú oculto, v2.2.1.1) envía logs internos a NetPay; la doc no
 dice qué contienen: VALIDAR antes de recomendarla con datos reales.
 
+## §diagnostico
+Ver lecciones-campo.md §diagnostico. Resumen: etiqueta de log propia y leer solo esa (`logcat -s <tag>`); no leer
+logs ni listar apps de terceros en la terminal; tocar (`pm clear`, reinstalar) solo la app propia, nunca apps
+de NetPay; en excepciones, clase + mensaje + 3 frames; no leer ni citar configuración global del
+desarrollador (p. ej. `~/.gradle/gradle.properties`) que pueda tener credenciales.
+
 ## Qué hacer si se expone una credencial o dato de tarjeta
 - Credencial: reportar de inmediato a soporte de integraciones de NetPay para su rotación.
 - Dato de tarjeta en un log o archivo: no repetirlo, enmascararlo en la respuesta y corregir el logging (S5).
