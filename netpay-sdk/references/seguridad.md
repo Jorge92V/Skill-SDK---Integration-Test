@@ -1,6 +1,6 @@
 # Seguridad para integradores
 
-## Reglas (resumen de SKILL.md §5; SKILL.md prevalece)
+## Reglas (resumen de SKILL.md §6; SKILL.md prevalece)
 - Sin credenciales de NetPay (Store ID, Password, llaves, tokens) en la app del integrador ni en su repo:
   las credenciales de prueba se capturan en la Smart PinPad DEV.
 - Solo tarjetas de prueba en la Smart PinPad DEV.

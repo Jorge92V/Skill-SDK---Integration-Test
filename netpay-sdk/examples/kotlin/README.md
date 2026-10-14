@@ -1,12 +1,12 @@
 # Ejemplo Kotlin — adapter + folio + máquina de estados + cancelación
 
 **Estado:** las firmas del SDK 1.1.9 usadas aquí se verificaron contra el AAR en una integración real
-(`references/lecciones-campo.md` §firmas). Este código de ejemplo en sí NO se ha compilado como proyecto:
+([lecciones-campo.md](../../references/lecciones-campo.md) §firmas). Este código de ejemplo en sí NO se ha compilado como proyecto:
 copiarlo, compilar contra el AAR y ajustar los `TODO(soporte NetPay)` (valor de `storeId` en
 cancelación/reimpresión y valores por defecto de los parámetros no usados de `SaleRequest`).
 
 ## Antes de copiar nada (primer arranque)
-1. Dependencia y repositorio: `references/quickstart.md` §3 (con `FAIL_ON_PROJECT_REPOS`, jitpack va en
+1. Dependencia y repositorio: [quickstart.md](../../references/quickstart.md) §3 (con `FAIL_ON_PROJECT_REPOS`, jitpack va en
    `dependencyResolutionManagement`) y `android.enableJetifier=true`.
 2. `<queries>` en el manifiesto con el authority/acción del SDK (leídos del AAR o del mensaje de la
    excepción, nunca por package). Sin esto, `doTrans` lanza `IllegalArgumentException: Unknown URL ...`.

@@ -1,0 +1,5 @@
+dist/
+evals/runs/
+__pycache__/
+*.pyc
+.DS_Store

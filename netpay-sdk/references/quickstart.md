@@ -56,7 +56,7 @@ content://...` y la PinPad no abre. Por authority/acción, NUNCA por package. Va
 mensaje de la excepción. Detalle y plantilla: lecciones-campo.md §visibilidad (VALIDAR con NetPay).
 
 ## 5. Primera venta [doc + skill]
-Usar el adapter de `assets/ejemplo-kotlin/` (folio persistido → `SaleRequest` con argumentos nombrados →
+Usar el adapter de [`examples/kotlin/`](../examples/kotlin/README.md) (folio persistido → `SaleRequest` con argumentos nombrados →
 `doTrans` → `onActivityResult` → máquina de estados de transacciones.md §estado). Datos de prueba: solo
 los de sandbox.md.
 

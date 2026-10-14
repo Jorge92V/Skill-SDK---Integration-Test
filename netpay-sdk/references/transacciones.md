@@ -33,7 +33,7 @@ Para respuesta y callbacks ver §respuesta.
 - El SDK NO expone interfaz inyectable (confirmado por el dueño). El integrador define su propia
   interfaz (p. ej. `PaymentGateway`) y una implementación que envuelve al SDK; la lógica de la app
   (folio, estados, UI) depende solo de esa interfaz y se prueba con un fake sin terminal.
-- Ejemplo de referencia: `assets/ejemplo-kotlin/` (sin compilar; ver su README).
+- Ejemplo de referencia: [`examples/kotlin/`](../examples/kotlin/README.md) (sin compilar; ver su README).
 
 ## §folio
 - El folio viaja en la venta (`folio`) y es la llave para recuperar el resultado. Si la venta no

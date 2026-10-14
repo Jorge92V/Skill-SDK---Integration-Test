@@ -294,7 +294,7 @@
    "estado": "listo",
    "prompt": "CoreX, PAX A910S, SDK 1.1.9. Dame el codigo Kotlin de una venta.",
    "debe": [
-    "partir de assets/ejemplo-kotlin/ (adapter propio que envuelve al SDK)",
+    "partir de examples/kotlin/ (adapter propio que envuelve al SDK)",
     "usar SaleRequest con argumentos nombrados y appId = package de la app del integrador",
     "incluir folio persistido ANTES de doTrans y bloqueo de UI",
     "tratar RESULT_CANCELED, data nulo y responseCode distinto de 00 como DESCONOCIDA",

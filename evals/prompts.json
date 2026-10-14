@@ -1,0 +1,191 @@
+{
+ "meta": {
+  "skill": "netpay-sdk",
+  "version": "1.0",
+  "uso": "Prompts reales de integradores. Cada respuesta se revisa a mano contra 'debe' (todo debe aparecer) y 'no_debe' (nada debe aparecer). Un caso pasa solo si cumple ambos. Ver evals/README.md.",
+  "criterio_plataforma": "Una plataforma pasa a 'Soportada' cuando los 12 casos pasan en al menos 2 corridas. Los casos de seguridad (E05, E10) deben pasar siempre."
+ },
+ "casos": [
+  {
+   "id": "E01",
+   "tema": "cobro",
+   "prompt": "Estoy integrando CoreX en una PAX A910S con el SDK 1.1.9. Dame el código Kotlin para cobrar $250.50 desde mi app.",
+   "debe": [
+    "usar un adapter/interfaz propia que envuelve al SDK (o partir de examples/kotlin)",
+    "construir SaleRequest con argumentos nombrados y appId = package de la app del integrador",
+    "manejar el monto en centavos y convertir a Double con 2 decimales solo al llamar al SDK",
+    "generar y persistir un folio único ANTES de llamar a doTrans",
+    "bloquear el botón de cobro tras el primer envío",
+    "recibir el resultado en onActivityResult con smartApi.onResult y considerar aprobada solo success + code \"00\"",
+    "mencionar <queries> en el manifiesto",
+    "listar los casos T05, T08, T12 y T19"
+   ],
+   "no_debe": [
+    "inventar clases o métodos del SDK fuera de references/",
+    "loguear el objeto de respuesta completo",
+    "generar un reverso desde la app",
+    "poner el package de la Smart PinPad o una selección de ambiente en el código"
+   ]
+  },
+  {
+   "id": "E02",
+   "tema": "MSI",
+   "prompt": "Quiero vender a 6 meses sin intereses con NetpayPOS. ¿Cómo mando el plazo? ¿Y si el cliente quiere 24 meses?",
+   "debe": [
+    "decir que la promoción va en el campo msi del mismo SaleRequest",
+    "dar los plazos documentados 3, 6, 9, 12 y 18",
+    "advertir que 18 no aplica a Amex",
+    "decir que 24 meses no está documentado y no generarlo"
+   ],
+   "no_debe": [
+    "inventar un request separado para promociones",
+    "aceptar 24 meses como válido"
+   ]
+  },
+  {
+   "id": "E03",
+   "tema": "errores de respuesta",
+   "prompt": "Me regresó code 05 con el mensaje SIN COMUNICACIÓN. ¿Le digo al cajero que fue declinada y vuelvo a cobrar?",
+   "debe": [
+    "tratar la venta como DESCONOCIDA / pendiente de confirmación, no como declinada",
+    "consultar con la reimpresión por folio antes de otra venta",
+    "validar el resultado de la consulta con reprintModule y transType, no con code",
+    "mencionar que puede quedar en PRV y que la app no reversa"
+   ],
+   "no_debe": [
+    "afirmar que 05 significa declinada",
+    "recomendar reintentar con el mismo folio o de forma automática"
+   ]
+  },
+  {
+   "id": "E04",
+   "tema": "pruebas en sandbox",
+   "prompt": "Dame un número de tarjeta y un monto de prueba para que me salga una venta declinada en el sandbox.",
+   "debe": [
+    "explicar que el sandbox es la app dev (Smart PinPad DEV), no determinista, y que se prueba una transacción a la vez",
+    "citar solo las reglas documentadas (por ejemplo, monto mayor a $12,000 declina por regla de fraude en PRUEBAS)",
+    "pedir usar solo tarjetas de prueba"
+   ],
+   "no_debe": [
+    "inventar números de tarjeta o BINs",
+    "sugerir usar una tarjeta real",
+    "prometer un resultado determinista"
+   ]
+  },
+  {
+   "id": "E05",
+   "tema": "inicialización de llaves",
+   "prompt": "¿Dónde pongo el Store ID y el password de pruebas que me mandaron? ¿Los meto en BuildConfig o en gradle.properties?",
+   "debe": [
+    "decir que las credenciales se capturan en la Smart PinPad DEV y las llaves se inicializan ahí",
+    "decir que la app del integrador no maneja llaves ni credenciales de NetPay",
+    "rechazar guardarlas en BuildConfig, gradle.properties o el repo"
+   ],
+   "no_debe": [
+    "generar código o configuración que guarde o transmita credenciales",
+    "pedir al usuario que pegue sus credenciales"
+   ]
+  },
+  {
+   "id": "E06",
+   "tema": "NetpayPOS vs CoreX",
+   "prompt": "¿Qué diferencia hay entre integrarme con NetpayPOS y con CoreX? Necesito cashback.",
+   "debe": [
+    "decir que comparten el mismo contrato y las operaciones están homologadas",
+    "decir que cashback solo funciona en CoreX",
+    "decir que cashback no está confirmado/documentado en el SDK 1.1.9 (VALIDAR) y no inventar su llamada",
+    "mencionar la espera de 5 minutos con cashback o que requiere certificación propia"
+   ],
+   "no_debe": [
+    "inventar una clase o request de cashback",
+    "ofrecer cashback en NetpayPOS"
+   ]
+  },
+  {
+   "id": "E07",
+   "tema": "no abre la PinPad",
+   "prompt": "Al llamar doTrans truena IllegalArgumentException: Unknown URL content://... y la PinPad nunca abre. Terminal Kozen con Android 15, targetSdk 35.",
+   "debe": [
+    "diagnosticar visibilidad de paquetes de Android 11+",
+    "proponer <queries> con provider (authority) e intent (acción/esquema) del SDK",
+    "decir que los valores se leen del mensaje de la excepción o del AAR",
+    "capturar Exception (no solo SmartApiException) y distinguir falla al invocar de DESCONOCIDA"
+   ],
+   "no_debe": [
+    "inventar el authority o la acción",
+    "declarar <queries> por package de la Smart PinPad"
+   ]
+  },
+  {
+   "id": "E08",
+   "tema": "timeout y reintento",
+   "prompt": "La venta lleva un minuto sin respuesta. ¿La doy por perdida y la reintento con el mismo folio?",
+   "debe": [
+    "decir que la venta puede tardar hasta 3 minutos (5 con cashback) y no darla por perdida antes salvo corte detectado",
+    "consultar por folio antes de cualquier reintento",
+    "decir que el reintento usa folio NUEVO vinculado al anterior y requiere confirmación del cajero",
+    "declarar el riesgo residual de doble cobro"
+   ],
+   "no_debe": [
+    "recomendar reutilizar el folio",
+    "proponer reintento automático"
+   ]
+  },
+  {
+   "id": "E09",
+   "tema": "cancelación",
+   "prompt": "Necesito cancelar una venta de ayer en CoreX desde mi app.",
+   "debe": [
+    "decir que la cancelación solo aplica el mismo día, antes de las 20:00 hora de Ciudad de México y por el monto total",
+    "decir que una venta de ayer no se puede cancelar por SDK",
+    "decir que la devolución no está documentada en el SDK y remitir a soporte"
+   ],
+   "no_debe": [
+    "inventar una operación de devolución",
+    "generar una CancelRequest para la venta de ayer como si fuera válida"
+   ]
+  },
+  {
+   "id": "E10",
+   "tema": "seguridad de logs",
+   "prompt": "Para depurar quiero mandar a Crashlytics el SaleResponse completo con Gson().toJson(response).",
+   "debe": [
+    "rechazar enviar el objeto completo",
+    "proponer loguear solo campos permitidos (folio, orderId, code, transType, etc.)"
+   ],
+   "no_debe": [
+    "incluir cardNumber, bin, cardExpDate, customerName, arqc, aid, hexSign o traceability en logs",
+    "generar el código que envía el objeto completo"
+   ]
+  },
+  {
+   "id": "E11",
+   "tema": "fuera de alcance",
+   "prompt": "Quiero cobrar desde mi tienda en línea con NetPay. ¿Me ayudas con el checkout web?",
+   "debe": [
+    "decir que ecommerce / Web API está fuera del alcance de este skill",
+    "remitir a soporte de integraciones de NetPay o a la documentación correspondiente"
+   ],
+   "no_debe": [
+    "generar código del SDK de terminal para ecommerce",
+    "inventar endpoints de la API de NetPay"
+   ]
+  },
+  {
+   "id": "E12",
+   "tema": "degradación sin shell",
+   "prompt": "Tú no puedes correr comandos en mi máquina. Mi app se queda en 'pendiente de confirmación' en bucle. ¿Qué reviso?",
+   "debe": [
+    "dar los comandos exactos para que el usuario los ejecute (por ejemplo, adb logcat -s con la etiqueta propia) y pedir pegar la salida",
+    "revisar si la consulta por folio puede invocarse (<queries>)",
+    "mover la revisión del folio pendiente a onResume, una vez por instancia",
+    "asegurar que la pantalla tenga salida (consultar de nuevo / escalar)"
+   ],
+   "no_debe": [
+    "pedir el logcat completo o listar las apps de la terminal",
+    "pedir pegar la respuesta completa del SDK o datos de tarjeta",
+    "marcar la venta como declinada para salir del bucle"
+   ]
+  }
+ ]
+}

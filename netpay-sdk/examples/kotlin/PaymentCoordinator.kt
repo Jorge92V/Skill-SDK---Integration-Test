@@ -7,7 +7,7 @@ import android.content.Intent
  * Lógica de la app: folio, máquina de estados, bloqueo de cobro. Depende solo de PaymentGateway,
  * así que se prueba en JVM con FakePaymentGateway.
  *
- * Reglas (SKILL.md §6, transacciones.md, lecciones-campo.md):
+ * Reglas (SKILL.md §7, transacciones.md, lecciones-campo.md):
  *  - Folio único por intención, persistido ANTES de doTrans. Montos en centavos.
  *  - Mientras haya INICIADA/ENVIADA/DESCONOCIDA no se acepta otra venta (doble toque, T12).
  *  - Falla al INVOCAR ≠ respuesta no concluyente. Si ni la venta ni la consulta pueden invocarse:
